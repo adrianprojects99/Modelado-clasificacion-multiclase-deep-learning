@@ -1,0 +1,622 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Clasificador VGG16 - Celebrity Recognition</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --primary-color: #667eea;
+            --secondary-color: #764ba2;
+            --success-color: #4ecdc4;
+            --danger-color: #ff6b6b;
+            --dark-bg: #1a1a2e;
+            --card-bg: #16213e;
+            --text-light: #ffffff;
+            --text-muted: #a0aec0;
+            --border-color: #2d3748;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, var(--dark-bg) 0%, #0f3460 100%);
+            color: var(--text-light);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        /* Header */
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+            padding: 30px 0;
+            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+            border-radius: 20px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+        }
+
+        .header p {
+            font-size: 1.1rem;
+            color: rgba(255, 255, 255, 0.9);
+        }
+
+        /* Main Content */
+        .main-content {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            margin-bottom: 40px;
+        }
+
+        @media (max-width: 968px) {
+            .main-content {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* Cards */
+        .card {
+            background: var(--card-bg);
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+            border: 1px solid var(--border-color);
+        }
+
+        .card h2 {
+            font-size: 1.8rem;
+            margin-bottom: 20px;
+            color: var(--success-color);
+        }
+
+        /* Upload Section */
+        .upload-area {
+            border: 3px dashed var(--border-color);
+            border-radius: 15px;
+            padding: 40px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            background: rgba(255, 255, 255, 0.02);
+        }
+
+        .upload-area:hover {
+            border-color: var(--primary-color);
+            background: rgba(102, 126, 234, 0.1);
+            transform: translateY(-5px);
+        }
+
+        .upload-area.dragover {
+            border-color: var(--success-color);
+            background: rgba(78, 205, 196, 0.1);
+        }
+
+        .upload-icon {
+            font-size: 4rem;
+            margin-bottom: 15px;
+            color: var(--primary-color);
+        }
+
+        .upload-text {
+            font-size: 1.1rem;
+            color: var(--text-muted);
+            margin-bottom: 15px;
+        }
+
+        .btn {
+            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+            color: white;
+            padding: 12px 30px;
+            border: none;
+            border-radius: 25px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.3);
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        /* Image Preview */
+        .image-preview {
+            margin-top: 20px;
+            display: none;
+        }
+
+        .image-preview.active {
+            display: block;
+        }
+
+        .preview-container {
+            position: relative;
+            border-radius: 15px;
+            overflow: hidden;
+            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.3);
+        }
+
+        .preview-image {
+            width: 100%;
+            height: auto;
+            display: block;
+        }
+
+        .remove-image {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: var(--danger-color);
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 35px;
+            height: 35px;
+            cursor: pointer;
+            font-size: 1.2rem;
+            transition: all 0.3s ease;
+            box-shadow: 0 3px 10px rgba(0, 0, 0, 0.3);
+        }
+
+        .remove-image:hover {
+            transform: scale(1.1);
+            background: #ff5252;
+        }
+
+        /* Results Section */
+        .results {
+            display: none;
+        }
+
+        .results.active {
+            display: block;
+            animation: fadeIn 0.5s ease;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .prediction-result {
+            background: linear-gradient(135deg, rgba(78, 205, 196, 0.2), rgba(78, 205, 196, 0.05));
+            border: 2px solid var(--success-color);
+            border-radius: 15px;
+            padding: 25px;
+            margin-bottom: 25px;
+            text-align: center;
+        }
+
+        .predicted-class {
+            font-size: 2rem;
+            font-weight: bold;
+            color: var(--success-color);
+            margin-bottom: 10px;
+        }
+
+        .confidence {
+            font-size: 1.3rem;
+            color: var(--text-muted);
+        }
+
+        .confidence-value {
+            color: var(--success-color);
+            font-weight: bold;
+        }
+
+        /* Probability Bars */
+        .probability-bars {
+            margin-top: 25px;
+        }
+
+        .prob-item {
+            margin-bottom: 20px;
+        }
+
+        .prob-label {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+            font-size: 1rem;
+        }
+
+        .prob-class-name {
+            font-weight: 600;
+        }
+
+        .prob-value {
+            color: var(--success-color);
+            font-weight: bold;
+        }
+
+        .prob-bar-container {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            height: 30px;
+            overflow: hidden;
+            box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.2);
+        }
+
+        .prob-bar {
+            height: 100%;
+            background: linear-gradient(90deg, var(--primary-color), var(--success-color));
+            border-radius: 10px;
+            transition: width 1s ease;
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            padding-right: 10px;
+            color: white;
+            font-weight: bold;
+            font-size: 0.9rem;
+        }
+
+        /* Loading Spinner */
+        .spinner {
+            display: none;
+            border: 4px solid rgba(255, 255, 255, 0.1);
+            border-radius: 50%;
+            border-top: 4px solid var(--primary-color);
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+        }
+
+        .spinner.active {
+            display: block;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* Model Info */
+        .model-info {
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 10px;
+            padding: 15px;
+            margin-top: 20px;
+        }
+
+        .info-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .info-item:last-child {
+            border-bottom: none;
+        }
+
+        .info-label {
+            color: var(--text-muted);
+        }
+
+        .info-value {
+            font-weight: bold;
+            color: var(--success-color);
+        }
+
+        /* Footer */
+        .footer {
+            text-align: center;
+            padding: 20px;
+            color: var(--text-muted);
+            font-size: 0.9rem;
+        }
+
+        .footer a {
+            color: var(--primary-color);
+            text-decoration: none;
+            transition: color 0.3s ease;
+        }
+
+        .footer a:hover {
+            color: var(--success-color);
+        }
+
+        /* Error Message */
+        .error-message {
+            background: rgba(255, 107, 107, 0.2);
+            border: 2px solid var(--danger-color);
+            border-radius: 10px;
+            padding: 15px;
+            margin-top: 15px;
+            display: none;
+        }
+
+        .error-message.active {
+            display: block;
+        }
+
+        .error-message p {
+            color: var(--danger-color);
+            font-weight: 600;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <h1>🎭 Clasificador de Celebridades VGG16</h1>
+            <p>Modelo de Deep Learning para reconocimiento facial</p>
+        </div>
+
+        <!-- Main Content -->
+        <div class="main-content">
+            <!-- Upload Section -->
+            <div class="card">
+                <h2>📤 Subir Imagen</h2>
+                
+                <div class="upload-area" id="uploadArea">
+                    <div class="upload-icon">📸</div>
+                    <div class="upload-text">
+                        Arrastra una imagen aquí o haz clic para seleccionar
+                    </div>
+                    <input type="file" id="imageInput" accept="image/*" style="display: none;">
+                    <button class="btn" onclick="document.getElementById('imageInput').click()">
+                        Seleccionar Imagen
+                    </button>
+                </div>
+
+                <div class="image-preview" id="imagePreview">
+                    <div class="preview-container">
+                        <img id="previewImage" class="preview-image" src="" alt="Preview">
+                        <button class="remove-image" onclick="removeImage()">✕</button>
+                    </div>
+                    <button class="btn" id="predictBtn" onclick="predictImage()" style="margin-top: 20px; width: 100%;">
+                        🔮 Realizar Predicción
+                    </button>
+                </div>
+
+                <div class="spinner" id="spinner"></div>
+                <div class="error-message" id="errorMessage">
+                    <p id="errorText"></p>
+                </div>
+            </div>
+
+            <!-- Results Section -->
+            <div class="card">
+                <h2>📊 Resultados</h2>
+                
+                <div class="results" id="results">
+                    <div class="prediction-result">
+                        <div class="predicted-class" id="predictedClass">-</div>
+                        <div class="confidence">
+                            Confianza: <span class="confidence-value" id="confidenceValue">-%</span>
+                        </div>
+                    </div>
+
+                    <div class="probability-bars" id="probabilityBars">
+                        <!-- Se llenará dinámicamente -->
+                    </div>
+                </div>
+
+                <div class="model-info">
+                    <h3 style="margin-bottom: 15px; color: var(--primary-color);">ℹ️ Información del Modelo</h3>
+                    <div class="info-item">
+                        <span class="info-label">Arquitectura:</span>
+                        <span class="info-value">VGG16</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">Clases:</span>
+                        <span class="info-value" id="modelClasses">-</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">Accuracy (Test):</span>
+                        <span class="info-value" id="modelAccuracy">-</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">AUC Score:</span>
+                        <span class="info-value" id="modelAUC">-</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="footer">
+            <p>Desarrollado con ❤️ usando TensorFlow y VGG16</p>
+            <p>
+                <a href="https://www.kaggle.com/datasets/vishesh1412/celebrity-face-image-dataset/data" target="_blank">
+                    Dataset de Kaggle
+                </a>
+            </p>
+        </div>
+    </div>
+
+    <script>
+        let selectedFile = null;
+
+        // Cargar información del modelo al inicio
+        fetch('/api/model-info')
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById('modelClasses').textContent = data.classes.join(', ');
+                document.getElementById('modelAccuracy').textContent = 
+                    (data.test_metrics.accuracy * 100).toFixed(2) + '%';
+                document.getElementById('modelAUC').textContent = 
+                    data.test_metrics.auc.toFixed(4);
+            })
+            .catch(error => console.error('Error cargando info del modelo:', error));
+
+        // Upload area - drag and drop
+        const uploadArea = document.getElementById('uploadArea');
+        const imageInput = document.getElementById('imageInput');
+        const imagePreview = document.getElementById('imagePreview');
+        const previewImage = document.getElementById('previewImage');
+
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.classList.add('dragover');
+        });
+
+        uploadArea.addEventListener('dragleave', () => {
+            uploadArea.classList.remove('dragover');
+        });
+
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.classList.remove('dragover');
+            
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                handleFileSelect(files[0]);
+            }
+        });
+
+        imageInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                handleFileSelect(e.target.files[0]);
+            }
+        });
+
+        function handleFileSelect(file) {
+            if (!file.type.startsWith('image/')) {
+                showError('Por favor selecciona un archivo de imagen válido');
+                return;
+            }
+
+            selectedFile = file;
+            
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                previewImage.src = e.target.result;
+                imagePreview.classList.add('active');
+                hideError();
+                hideResults();
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function removeImage() {
+            selectedFile = null;
+            previewImage.src = '';
+            imagePreview.classList.remove('active');
+            imageInput.value = '';
+            hideResults();
+        }
+
+        async function predictImage() {
+            if (!selectedFile) {
+                showError('Por favor selecciona una imagen primero');
+                return;
+            }
+
+            // Mostrar spinner
+            document.getElementById('spinner').classList.add('active');
+            document.getElementById('predictBtn').disabled = true;
+            hideError();
+
+            try {
+                const formData = new FormData();
+                formData.append('image', selectedFile);
+
+                const response = await fetch('/api/predict', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    displayResults(data.result);
+                } else {
+                    showError(data.error || 'Error al realizar la predicción');
+                }
+            } catch (error) {
+                showError('Error de conexión: ' + error.message);
+            } finally {
+                document.getElementById('spinner').classList.remove('active');
+                document.getElementById('predictBtn').disabled = false;
+            }
+        }
+
+        function displayResults(result) {
+            // Mostrar clase predicha
+            document.getElementById('predictedClass').textContent = result.predicted_class;
+            document.getElementById('confidenceValue').textContent = 
+                (result.confidence * 100).toFixed(2) + '%';
+
+            // Crear barras de probabilidad
+            const probabilityBars = document.getElementById('probabilityBars');
+            probabilityBars.innerHTML = '';
+
+            // Ordenar probabilidades de mayor a menor
+            const sortedProbs = Object.entries(result.probabilities)
+                .sort((a, b) => b[1] - a[1]);
+
+            sortedProbs.forEach(([className, prob]) => {
+                const probItem = document.createElement('div');
+                probItem.className = 'prob-item';
+                
+                const percentage = (prob * 100).toFixed(2);
+                
+                probItem.innerHTML = `
+                    <div class="prob-label">
+                        <span class="prob-class-name">${className}</span>
+                        <span class="prob-value">${percentage}%</span>
+                    </div>
+                    <div class="prob-bar-container">
+                        <div class="prob-bar" style="width: ${percentage}%">
+                            ${percentage}%
+                        </div>
+                    </div>
+                `;
+                
+                probabilityBars.appendChild(probItem);
+            });
+
+            // Mostrar resultados
+            document.getElementById('results').classList.add('active');
+        }
+
+        function showError(message) {
+            document.getElementById('errorText').textContent = message;
+            document.getElementById('errorMessage').classList.add('active');
+        }
+
+        function hideError() {
+            document.getElementById('errorMessage').classList.remove('active');
+        }
+
+        function hideResults() {
+            document.getElementById('results').classList.remove('active');
+        }
+    </script>
+</body>
+</html>
